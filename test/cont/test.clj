@@ -5,23 +5,23 @@
 (with-test
   (defn amb [& xs]
     (shift k (mapcat k xs)))
-  (= (reset
-      (let [x (amb 1 2 3)
-            y (amb 2 4 6)]
-        (if (zero? (mod (+ x y) 3))
-          [[x y]])))
-     [[1 2] [2 4] [3 6]]))
+  (is (= (reset
+          (let [x (amb 1 2 3)
+                y (amb 2 4 6)]
+            (if (zero? (mod (+ x y) 3))
+              [[x y]])))
+         [[1 2] [2 4] [3 6]])))
 
 (with-test
   (defn yield [x]
     (shift k (cons x (k nil))))
-  (= (reset
-      (do
-        (yield 1)
-        (yield 2)
-        (yield 3)
-        nil))
-     [1 2 3]))
+  (is (= (reset
+          (do
+            (yield 1)
+            (yield 2)
+            (yield 3)
+            nil))
+         [1 2 3])))
 
 (deftest transformation
   (testing "if"
