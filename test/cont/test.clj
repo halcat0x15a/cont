@@ -24,9 +24,6 @@
          [1 2 3])))
 
 (deftest transformation
-  (testing "if"
-    (is (= (reset (if true :foo :bar)) :foo))
-    (is (= (reset (if false :foo :bar)) :bar)))
   (testing "do"
     (is (= (reset (do)) nil))
     (is (= (reset (do 0)) 0))
@@ -35,10 +32,10 @@
     (is (= (reset (let [] 0)) 0))
     (is (= (reset (let [foo :foo] foo)) :foo))
     (is (= (reset (let [foo :foo bar :bar] foo bar)) :bar)))
-  (testing "try"
-    (is (= (reset (try (throw (Exception.)) (catch Exception e :foo))) :foo))
-    (is (= (reset (try :foo (finally :bar))) :foo))
-    (is (= (reset (try (throw (Exception.)) (catch Exception e :foo) (finally :bar))) :foo)))
+  (testing "letfn"
+    (is (= (letfn [(f [x] x)] (f 0)) 0)))
+  (testing "throw"
+    (is (thrown? Exception (reset (throw (Exception.))))))
   (testing "."
     (is (= (reset (Integer/parseInt "0")) 0))
     (is (= (reset (.toString 0)) "0")))

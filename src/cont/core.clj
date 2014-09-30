@@ -5,95 +5,74 @@
 
 (extend-protocol Continuation
   Object
-  (call [obj k] (k obj))
+  (call [obj k]
+    (k obj))
   nil
-  (call [_ k] (k nil)))
+  (call [_ k]
+    (k nil)))
 
 (deftype Context [f]
   Continuation
   (call [ctx k]
     (f k)))
 
-(declare reset)
-
-(defmacro pass [cont param expr]
-  `(call (reset ~cont) (fn [~param] ~expr)))
-
-(defmulti transform
-  (fn [& exprs]
+(defmulti application
+  (fn [cont & exprs]
     (first exprs)))
 
-(defmethod transform 'if
-  ([_ test then]
-     (transform 'if test then nil))
-  ([_ test then else]
-     `(if (reset ~test) (reset ~then) (reset ~else))))
+(defn transform [cont expr]
+  (if (seq? expr)
+    (apply application cont (macroexpand expr))
+    (cont expr)))
 
-(defmethod transform 'do [_ & exprs]
+(defmethod application 'do [cont _ & exprs]
   (if exprs
     (if (next exprs)
-      `(pass ~(first exprs) _# ~(apply transform 'do (next exprs)))
-      (first exprs))))
+      (transform (fn [expr] `(call ~expr (fn [_#] ~(apply application cont 'do (next exprs))))) (first exprs))
+      (transform cont (first exprs)))
+    (cont nil)))
 
-(defmethod transform 'let* [_ bindings & exprs]
+(defmethod application 'let* [cont _ bindings & exprs]
   (let [bindings (partition 2 bindings)]
-    (reduce (fn [exprs [param expr]]
-              `(pass ~expr ~param ~exprs))
-            (apply transform 'do exprs)
+    (reduce (fn [expr [param init]]
+              (transform (fn [init] `(call ~init (fn [~param] ~expr))) init))
+            (apply application cont 'do exprs)
             (reverse bindings))))
 
-(defmethod transform 'letfn* [_ & exprs]
-  (apply transform 'let* exprs))
+(defmethod application 'letfn* [cont _ & exprs]
+  (apply application cont 'let* exprs))
 
-(defmethod transform 'loop* [_ & exprs]
-  (apply transform 'let* exprs))
+(defmethod application 'loop* [cont _ & exprs]
+  (apply application cont 'let* exprs))
 
-(defmethod transform 'throw [_ expr]
-  `(throw (reset ~expr)))
+(defmethod application 'throw [cont _ expr]
+  (application (fn [params] (cont `(throw ~@params))) expr))
 
-(defn app [expr & exprs]
-  (if exprs
-    (let [param (gensym)]
-      `(pass ~(first exprs) ~param ~(apply app (concat expr [param]) (next exprs))))
-    expr))
-
-(defn tagged? [symbol expr]
-  (and (seq? expr) (= symbol (first expr))))
-
-(defmethod transform 'try [_ & exprs]
-  (let [[exprs clauses] (split-with #(not (or (tagged? 'catch %) (tagged? 'finally %))) exprs)]
-    `(try ~(apply transform 'do exprs) ~@(map #(apply transform %) clauses))))
-
-(defmethod transform 'catch [_ class param & exprs]
-  `(catch ~class ~param ~(apply transform 'do exprs)))
-
-(defmethod transform 'finally [_ & exprs]
-  `(finally ~(apply transform 'do exprs)))
-
-(defmethod transform '. [_ expr method & exprs]
+(defmethod application '. [cont _ expr method & exprs]
   (if (and (symbol? expr) (class? (resolve expr)))
-    (apply app (list '. expr method) exprs)
+    (apply application (fn [params] (cont `(. ~expr ~method ~@params))) exprs)
     (let [param (gensym)]
-      `(pass ~expr ~param ~(apply app (list '. param method) exprs)))))
+      (application (fn [param] (apply application (fn [params] (cont `(. ~@param ~method ~@exprs))) exprs)) expr))))
 
-(defmethod transform 'new [_ class & exprs]
-  (apply app (list 'new class) exprs))
+(defmethod application 'new [cont _ class & exprs]
+  (apply application (fn [exprs] (cont `(new ~class ~@exprs))) exprs))
 
-(defmethod transform 'set! [_ symbol expr]
-  `(set! ~symbol (reset ~expr)))
+(defmethod application 'set! [cont _ symbol expr]
+  (application (fn [exprs] (cont `(set ~symbol ~@exprs))) expr))
 
-(defmethod transform nil [] '())
+(defmethod application nil [cont]
+  (cont '()))
 
-(defmethod transform :default [expr & exprs]
+(defmethod application :default [cont expr & exprs]
   (if (special-symbol? expr)
-    (cons expr exprs)
+    (cont `(~expr ~@exprs))
     (let [param (gensym)]
-      `(pass ~expr ~param ~(apply app (list param) exprs)))))
+      (if exprs
+        (transform (fn [expr] `(call ~expr (fn [~param] ~(apply application (fn [params] (cont `(~param ~@params))) exprs)))) expr)
+        (transform (fn [expr] `(call ~expr (fn [~param] ~(cont `(~param))))) expr)))))
 
-(defmacro reset [expr]
-  (if (seq? expr)
-    (apply transform (macroexpand expr))
-    expr))
+(defmacro reset [& exprs]
+  (transform identity `(do ~@exprs)))
 
-(defmacro shift [param & body]
-  `(Context. (fn [~param] ~@body)))
+(defmacro shift [param & exprs]
+  `(Context. (fn [~param] ~@exprs)))
