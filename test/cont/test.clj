@@ -16,14 +16,26 @@
   (defn yield [x]
     (shift k (cons x (k nil))))
   (is (= (reset
-          (do
-            (yield 1)
-            (yield 2)
-            (yield 3)
-            nil))
+           (yield 1)
+           (yield 2)
+           (yield 3)
+           nil)
          [1 2 3])))
 
+(with-test
+  (def tick
+    (shift k (fn [n] ((k nil) (inc n)))))
+  (is (= ((reset
+           tick
+           tick
+           identity)
+          0)
+         2)))
+
 (deftest transformation
+  (testing "if"
+    (is (= (reset (if true 0 1)) 0))
+    (is (= (reset (if false 0)) nil)))
   (testing "do"
     (is (= (reset (do)) nil))
     (is (= (reset (do 0)) 0))

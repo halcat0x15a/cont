@@ -25,6 +25,12 @@
     (apply application cont (macroexpand expr))
     (cont expr)))
 
+(defmethod application 'if
+  ([cont _ test then]
+     (application cont 'if test then nil))
+  ([cont _ test then else]
+     (transform (fn [expr] `(call ~expr (fn [param#] (if param# ~(transform cont then) ~(transform cont else))))) test)))
+
 (defmethod application 'do [cont _ & exprs]
   (if exprs
     (if (next exprs)
