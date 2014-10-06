@@ -1,7 +1,7 @@
 (ns cont.core)
 
 (defprotocol Continuation
-  (call [cont k]))
+  (call [this k]))
 
 (extend-protocol Continuation
   Object
@@ -11,10 +11,10 @@
   (call [_ k]
     (k nil)))
 
-(deftype Context [f]
+(deftype Context [cc]
   Continuation
   (call [ctx k]
-    (f k)))
+    (cc k)))
 
 (defmulti application
   (fn [cont & exprs]
@@ -78,7 +78,7 @@
         (transform (fn [expr] `(call ~expr (fn [~param] ~(cont `(~param))))) expr)))))
 
 (defmacro reset [& exprs]
-  (transform identity `(do ~@exprs)))
+  (transform identity `(identity (do ~@exprs))))
 
 (defmacro shift [param & exprs]
   `(Context. (fn [~param] ~@exprs)))
