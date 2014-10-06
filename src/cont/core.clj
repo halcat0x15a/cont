@@ -52,7 +52,7 @@
   (apply application cont 'let* exprs))
 
 (defmethod application 'throw [cont _ expr]
-  (application (fn [params] (cont `(throw ~@params))) expr))
+  (transform (fn [params] (cont `(throw ~params))) expr))
 
 (defmethod application '. [cont _ expr method & exprs]
   (if (and (symbol? expr) (class? (resolve expr)))
@@ -64,7 +64,7 @@
   (apply application (fn [exprs] (cont `(new ~class ~@exprs))) exprs))
 
 (defmethod application 'set! [cont _ symbol expr]
-  (application (fn [exprs] (cont `(set ~symbol ~@exprs))) expr))
+  (transform (fn [exprs] (cont `(set! ~symbol ~expr))) expr))
 
 (defmethod application nil [cont]
   (cont '()))
