@@ -11,7 +11,7 @@ A delimited continuations library for Clojure.
 Non-determinism:
 
 ```scala
-(require '[cont :refer [shift reset]])
+(require '[cont.core :refer [shift reset]])
 
 (defn amb [& xs]
   (shift k (mapcat k xs)))
@@ -31,11 +31,10 @@ Generator:
   (shift k (cons x (k nil))))
 
 (reset
-  (do
-    (yield 1)
-    (yield 2)
-    (yield 3)
-    nil))
+  (yield 1)
+  (yield 2)
+  (yield 3)
+  nil)
 ;=> (1 2 3)
 ```
 
