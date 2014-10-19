@@ -30,7 +30,7 @@
        (transform (fn [e] (cont `(~e))) expr))))
 
 (defn transform [cont expr]
-    (cond (symbol? expr) (let [e (gensym expr)] `(call ~expr (fn* [~e] ~(cont e))))
+    (cond (symbol? expr) (let [a (gensym)] `(call ~expr (fn* [~a] ~(cont a))))
           (seq? expr) (apply application cont (macroexpand expr))
           (vector? expr) (apply cps #(cont (vec %)) expr)
           (map? expr) (apply cps #(cont (into {} %)) expr)
