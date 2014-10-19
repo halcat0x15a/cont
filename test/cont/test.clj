@@ -6,10 +6,10 @@
   (defn amb [& xs]
     (shift k (mapcat k xs)))
   (is (= (reset
-          (let [x (amb 1 2 3)
-                y (amb 2 4 6)]
-            (if (zero? (mod (+ x y) 3))
-              [[x y]])))
+           (let [x (amb 1 2 3)
+                 y (amb 2 4 6)]
+             (if (zero? (mod (+ x y) 3))
+               [[x y]])))
          [[1 2] [2 4] [3 6]])))
 
 (with-test
@@ -26,30 +26,21 @@
   (def tick
     (shift k (fn [n] ((k nil) (inc n)))))
   (is (= ((reset
-           tick
-           tick
-           identity)
+            tick
+            tick
+            identity)
           0)
          2)))
 
 (deftest transformation
-  (testing "if"
-    (is (= (reset (if true 0 1)) 0))
-    (is (= (reset (if false 0)) nil)))
-  (testing "do"
-    (is (= (reset (do)) nil))
-    (is (= (reset (do 0)) 0))
-    (is (= (reset (do :foo :bar)) :bar)))
-  (testing "let"
-    (is (= (reset (let [] 0)) 0))
-    (is (= (reset (let [foo :foo] foo)) :foo))
-    (is (= (reset (let [foo :foo bar :bar] foo bar)) :bar)))
+  (testing "loop"
+    (is (= (reset (loop [x 0] x)) 0)))
   (testing "letfn"
-    (is (= (letfn [(f [x] x)] (f 0)) 0)))
+    (is (= (reset (letfn [(f [x] x)] (f 0))) 0)))
   (testing "throw"
     (is (thrown? Exception (reset (throw (Exception.))))))
   (testing "."
     (is (= (reset (Integer/parseInt "0")) 0))
     (is (= (reset (.toString 0)) "0")))
   (testing "new"
-    (is (= (reset (new String "foo")) "foo"))))
+    (is (= (reset (new String "0")) "0"))))
