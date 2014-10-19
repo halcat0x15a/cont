@@ -20,10 +20,7 @@
   (fn [cont & exprs]
     (first exprs)))
 
-(defn transform [cont expr]
-    (cond (seq? expr) (apply application cont (macroexpand expr))
-          (symbol? expr) (let [e (gensym expr)] `(call ~expr (fn* [~e] ~(cont e))))
-          :else (cont expr)))
+(declare transform)
 
 (defn cps
   ([cont] (cont ()))
@@ -31,6 +28,13 @@
      (if exprs
        (transform (fn [e] (apply cps (fn [es] (cont `(~e ~@es))) exprs)) expr)
        (transform (fn [e] (cont `(~e))) expr))))
+
+(defn transform [cont expr]
+    (cond (symbol? expr) (let [e (gensym expr)] `(call ~expr (fn* [~e] ~(cont e))))
+          (seq? expr) (apply application cont (macroexpand expr))
+          (vector? expr) (apply cps #(cont (vec %)) expr)
+          (map? expr) (apply cps #(cont (into {} %)) expr)
+          :else (cont expr)))
 
 (defmethod application 'if
   ([cont _ test then]
