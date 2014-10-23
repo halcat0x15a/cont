@@ -10,9 +10,31 @@ package object cont {
     def cc[B](f: A => B) = f(a)
   }
 
-  def reset(expr: Any): Any = macro resetImpl
+  trait Ans[A] {
+    type Type
+  }
 
-  def resetImpl(c: scala.reflect.macros.whitebox.Context)(expr: c.universe.Tree): c.universe.Tree = {
+  trait AnsImplicits {
+    implicit def ans[A] = new Ans[A] {
+      type Type = A
+    }
+  }
+
+  object Ans extends AnsImplicits {
+    implicit def context[A, B, C] = new Ans[Context[A, B, C]] {
+      type Type = A
+    }
+    implicit def fa[F[_], A](implicit a: Ans[A]) = new Ans[F[A]] {
+      type Type = F[a.Type]
+    }
+    implicit def fab[F[_, _], A, B](implicit a: Ans[A], b: Ans[B]) = new Ans[F[A, B]] {
+      type Type = F[a.Type, b.Type]
+    }
+  }
+
+  def reset[A](expr: A)(implicit ans: Ans[A]): ans.Type = macro resetImpl[A]
+
+  def resetImpl[A](c: scala.reflect.macros.blackbox.Context)(expr: c.Tree)(ans: c.Tree) = {
     import c.universe._
 
     def apply(expr: Tree, name: TermName)(cont: Tree => Tree) =
