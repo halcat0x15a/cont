@@ -1,4 +1,5 @@
 import scala.language.higherKinds
+import scala.language.implicitConversions
 import scala.language.experimental.macros
 
 package object cont {
@@ -23,6 +24,9 @@ package object cont {
     implicit def fab[F[_, _], A, B](implicit a: Ans[A], b: Ans[B]) = new Ans[F[A, B]] { type Type = F[a.Type, b.Type] }
   }
 
+  implicit def unsafe[A, B, C](context: Context[A, B, C]): A = throw new RuntimeException
+  def unsafe[A](a: A) = a
+
   def reset[A](expr: A)(implicit ans: Ans[A]): ans.Type = macro resetImpl
 
   def resetImpl(c: scala.reflect.macros.blackbox.Context)(expr: c.Tree)(ans: c.Tree) = {
@@ -44,6 +48,7 @@ package object cont {
 	  es match {
 	    case Nil =>
 	      e match {
+		case q"$a.$f[..$_](..$args)" => transform(a)(e => application(args)(as => apply(q"$e.$f(..$as)", name)(cont)))
 		case q"$f[..$_](..$args)" => application(args)(as => apply(q"$f(..$as)", name)(cont))
 		case q"val $x: $t = $a" => transform(a, x)(cont)
 		case _ => apply(e, name)(cont)
