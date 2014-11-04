@@ -17,76 +17,76 @@
     (cc k)))
 
 (defmulti application
-  (fn [cont & exprs]
+  (fn [cont ctx & exprs]
     (first exprs)))
 
 (declare transform)
 
 (defn cps
-  ([cont] (cont ()))
-  ([cont expr & exprs]
+  ([cont ctx] (cont ()))
+  ([cont ctx expr & exprs]
      (if exprs
-       (transform (fn [e] (apply cps (fn [es] (cont `(~e ~@es))) exprs)) expr)
-       (transform (fn [e] (cont `(~e))) expr))))
+       (transform (fn [e] (apply cps (fn [es] (cont `(~e ~@es))) ctx exprs)) ctx expr)
+       (transform (fn [e] (cont `(~e))) ctx expr))))
 
-(defn transform [cont expr]
+(defn transform [cont ctx expr]
     (cond (symbol? expr) (let [a (gensym)] `(call ~expr (fn* [~a] ~(cont a))))
-          (seq? expr) (apply application cont (macroexpand expr))
-          (vector? expr) (apply cps #(cont (vec %)) expr)
-          (map? expr) (apply cps #(cont (into {} %)) expr)
+          (seq? expr) (apply application cont ctx (macroexpand expr))
+          (vector? expr) (apply cps #(cont (vec %)) ctx expr)
+          (map? expr) (apply cps #(cont (into {} %)) ctx expr)
           :else (cont expr)))
 
 (defmethod application 'if
-  ([cont _ test then]
-     (application cont 'if test then nil))
-  ([cont _ test then else]
-     (transform (fn [e] `(if ~e ~(transform cont then) ~(transform cont else))) test)))
+  ([cont ctx _ test then]
+     (application cont ctx 'if test then nil))
+  ([cont ctx _ test then else]
+     (transform (fn [e] `(if ~e ~(transform cont ctx then) ~(transform cont ctx else))) ctx test)))
 
-(defmethod application 'do [cont _ & exprs]
+(defmethod application 'do [cont ctx _ & exprs]
   (if exprs
     (if (next exprs)
-      (transform (fn [_] (apply application cont 'do (next exprs))) (first exprs))
-      (transform cont (first exprs)))
+      (transform (fn [_] `(let* [~@(interleave (keys ctx) (vals ctx))] ~(apply application cont ctx 'do (next exprs)))) ctx (first exprs))
+      (transform cont ctx (first exprs)))
     (cont nil)))
 
-(defmethod application 'let* [cont _ bindings & exprs]
+(defmethod application 'let* [cont ctx _ bindings & exprs]
   (if (seq bindings)
-    (transform (fn [e] `(let* [~(first bindings) ~e] ~(apply application cont 'let* (nnext bindings) exprs))) (second bindings))
-    (apply application cont 'do exprs)))
+    (transform (fn [e] `(let* [~(first bindings) ~e] ~(apply application cont (assoc ctx (first bindings) e) 'let* (nnext bindings) exprs))) ctx (second bindings))
+    (apply application cont ctx 'do exprs)))
 
-(defmethod application 'letfn* [cont _ & exprs]
-  (apply application cont 'let* exprs))
+(defmethod application 'letfn* [cont ctx _ & exprs]
+  (apply application cont ctx 'let* exprs))
 
-(defmethod application 'loop* [cont _ & exprs]
-  (apply application cont 'let* exprs))
+(defmethod application 'loop* [cont ctx _ & exprs]
+  (apply application cont ctx 'let* exprs))
 
-(defmethod application 'throw [cont _ expr]
-  (transform (fn [e] (cont `(throw ~e))) expr))
+(defmethod application 'throw [cont ctx _ expr]
+  (transform (fn [e] (cont `(throw ~e))) ctx expr))
 
-(defmethod application '. [cont _ expr method & exprs]
+(defmethod application '. [cont ctx _ expr method & exprs]
   (let [a (gensym)]
     (if (and (symbol? expr) (class? (resolve expr)))
-      (apply cps (fn [es] `(call (. ~expr ~method ~@es) (fn* [~a] ~(cont a)))) exprs)
-      (transform (fn [e] (apply cps (fn [es] `(call (. ~e ~method ~@es) (fn* [~a] ~(cont a)))) exprs)) expr))))
+      (apply cps (fn [es] `(call (. ~expr ~method ~@es) (fn* [~a] ~(cont a)))) ctx exprs)
+      (transform (fn [e] (apply cps (fn [es] `(call (. ~e ~method ~@es) (fn* [~a] ~(cont a)))) ctx exprs)) ctx expr))))
 
-(defmethod application 'new [cont _ class & exprs]
+(defmethod application 'new [cont ctx _ class & exprs]
   (let [a (gensym)]
-    (apply cps (fn [es] `(call (new ~class ~@es) (fn* [~a] ~(cont a)))) exprs)))
+    (apply cps (fn [es] `(call (new ~class ~@es) (fn* [~a] ~(cont a)))) ctx exprs)))
 
-(defmethod application 'set! [cont _ symbol expr]
-  (transform (fn [e] (cont `(set! ~symbol ~e))) expr))
+(defmethod application 'set! [cont ctx _ symbol expr]
+  (transform (fn [e] (cont `(set! ~symbol ~e))) ctx expr))
 
 (defmethod application nil [cont]
   (cont ()))
 
-(defmethod application :default [cont expr & exprs]
+(defmethod application :default [cont ctx expr & exprs]
   (if (special-symbol? expr)
     (cont `(~expr ~@exprs))
     (let [a (gensym)]
-      (apply cps (fn [e] `(call ~e (fn* [~a] ~(cont a)))) expr exprs))))
+      (apply cps (fn [e] `(call ~e (fn* [~a] ~(cont a)))) ctx expr exprs))))
 
 (defmacro reset [& exprs]
-  (transform identity `(do ~@exprs)))
+  (transform identity {} `(do ~@exprs)))
 
 (defmacro shift [param & exprs]
   `(Context. (fn* [~param] ~@exprs)))
