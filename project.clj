@@ -1,4 +1,4 @@
-(defproject cont "0.3.2"
+(defproject cont "0.3.3"
   :description "Delimited continuations library"
   :url "https://github.com/halcat0x15a/cont"
   :license {:name "Eclipse Public License"
