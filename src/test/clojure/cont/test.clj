@@ -16,21 +16,35 @@
   (defn yield [x]
     (shift k (cons x (k nil))))
   (is (= (reset
+           (yield 0)
            (yield 1)
-           (yield 2)
-           (yield 3)
-           nil)
-         [1 2 3])))
+           (yield 2))
+         [0 1 2])))
 
-(with-test
-  (def tick
-    (shift k (fn [n] ((k nil) (inc n)))))
-  (is (= ((reset
-            tick
-            tick
-            identity)
-          0)
-         2)))
+(defmacro stack [& args]
+  `((reset (let* [x# (do ~@args)] (fn* [_#] x#))) []))
+
+(set-test stack
+  (letfn [(push [x] (shift k (fn [s] ((k (cons x s)) (cons x s)))))
+          (pop [] (shift k (fn [s] ((k (first s)) (next s)))))]
+    (is (= (stack
+             (push 0)
+             (push 1)
+             (push 2))
+           [2 1 0]))
+    (is (= (stack
+             (push 0)
+             (push 1)
+             (pop)
+             (push 2))
+            [2 0]))
+    (is (= (stack
+             (push 0)
+             (push 1)
+             (push 2)
+             (pop)
+             (pop))
+           1))))
 
 (deftest transformation
   (testing "loop"
