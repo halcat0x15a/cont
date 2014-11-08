@@ -8,9 +8,9 @@ A delimited continuations library for Clojure.
 
 ## Usage
 
-Non-determinism:
+Non-determinism
 
-```scala
+```clojure
 (require '[cont.core :refer [shift reset]])
 
 (defn amb [& xs]
@@ -24,17 +24,16 @@ Non-determinism:
 ;=> ([1 2] [2 4] [3 6])
 ```
 
-Generator:
+Generator
 
-```scala
+```clojure
 (defn yield [x]
   (shift k (cons x (k nil))))
 
 (reset
   (yield 1)
   (yield 2)
-  (yield 3)
-  nil)
+  (yield 3))
 ;=> (1 2 3)
 ```
 
